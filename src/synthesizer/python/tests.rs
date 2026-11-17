@@ -65,6 +65,45 @@ const SIMPLE_TEMPLATE: &str = r#"{
     }
 }"#;
 
+fn assert_conditional_resource_has_no_empty_guard(resource_type: &str, properties: serde_json::Value) {
+    let template = serde_json::json!({
+        "Conditions": {"CreateResource": {"Fn::Equals": ["yes", "yes"]}},
+        "Resources": {
+            "ConditionalResource": {
+                "Type": resource_type,
+                "Condition": "CreateResource",
+                "Properties": properties
+            }
+        }
+    });
+    for class_type in [ClassType::Stack, ClassType::Construct] {
+        let cfn: CloudformationParseTree = serde_json::from_value(template.clone()).unwrap();
+        let ir = CloudformationProgramIr::from(cfn, Schema::builtin()).unwrap();
+        let mut output = Vec::new();
+        ir.synthesize("python", &mut output, "TestStack", class_type)
+            .unwrap();
+        let code = String::from_utf8(output).unwrap();
+
+        assert!(
+            !code.trim_end().ends_with("if (conditionalResource is not None):"),
+            "Conditional resource leaves an empty Python suite:\n{code}"
+        );
+    }
+}
+
+#[test]
+fn test_conditional_resource_without_attributes() {
+    assert_conditional_resource_has_no_empty_guard("AWS::S3::Bucket", serde_json::json!({}));
+}
+
+#[test]
+fn test_conditional_cfn_custom_resource_without_attributes() {
+    assert_conditional_resource_has_no_empty_guard(
+        "AWS::CloudFormation::CustomResource",
+        serde_json::json!({"ServiceToken": "arn:aws:lambda:us-east-1:123456789:function:handler"}),
+    );
+}
+
 #[test]
 fn test_class_type_stack_mode() {
     let cfn: CloudformationParseTree = serde_json::from_str(SIMPLE_TEMPLATE).unwrap();
