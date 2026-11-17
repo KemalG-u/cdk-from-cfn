@@ -65,7 +65,10 @@ const SIMPLE_TEMPLATE: &str = r#"{
     }
 }"#;
 
-fn assert_conditional_resource_has_no_empty_guard(resource_type: &str, properties: serde_json::Value) {
+fn assert_conditional_resource_has_no_empty_guard(
+    resource_type: &str,
+    properties: serde_json::Value,
+) {
     let template = serde_json::json!({
         "Conditions": {"CreateResource": {"Fn::Equals": ["yes", "yes"]}},
         "Resources": {
@@ -108,7 +111,9 @@ fn test_conditional_cfn_custom_resource_without_attributes() {
 fn test_conditional_resource_with_attributes_keeps_guard() {
     for attributes in [
         serde_json::json!({"Metadata": {"note": "test"}}),
-        serde_json::json!({"UpdatePolicy": {"AutoScalingRollingUpdate": {"MinInstancesInService": 1}}}),
+        serde_json::json!({
+            "UpdatePolicy": {"AutoScalingRollingUpdate": {"MinInstancesInService": 1}}
+        }),
         serde_json::json!({"DeletionPolicy": "Retain"}),
         serde_json::json!({"DependsOn": ["OtherBucket"]}),
     ] {
