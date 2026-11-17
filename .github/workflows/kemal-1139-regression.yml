@@ -16,7 +16,8 @@ jobs:
       - name: Install pinned upstream Rust toolchain
         run: rustup toolchain install 1.100.0 --profile minimal --component rustfmt,clippy
       - name: Python synthesizer unit tests
-        run: cargo test --locked --lib synthesizer::python::tests:: -- --nocapture
+        run: |
+          cargo test --locked --lib synthesizer::python::tests:: -- --nocapture
       - name: Check formatting of changed Rust files
         if: always()
         run: rustfmt --check --edition 2021 --config skip_children=true src/synthesizer/python/mod.rs src/synthesizer/python/tests.rs
