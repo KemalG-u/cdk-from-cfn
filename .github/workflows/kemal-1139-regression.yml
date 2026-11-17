@@ -15,8 +15,14 @@ jobs:
           persist-credentials: false
       - name: Install pinned upstream Rust toolchain
         run: rustup toolchain install 1.100.0 --profile minimal --component rustfmt,clippy
-      - name: Focused regression tests
-        run: cargo test --locked --lib synthesizer::python::tests::test_conditional_ -- --nocapture
+      - name: Python synthesizer unit tests
+        run: cargo test --locked --lib synthesizer::python::tests:: -- --nocapture
+      - name: Check formatting of changed Rust files
+        if: always()
+        run: rustfmt --check --edition 2021 --config skip_children=true src/synthesizer/python/mod.rs src/synthesizer/python/tests.rs
+      - name: Project clippy checks
+        if: always()
+        run: cargo clippy --locked --tests -- -Adead-code -Dwarnings -Dclippy::dbg_macro
       - name: Compile generated Python through the public CLI
         if: always()
         run: |
