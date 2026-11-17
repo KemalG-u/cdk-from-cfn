@@ -105,6 +105,45 @@ fn test_conditional_cfn_custom_resource_without_attributes() {
 }
 
 #[test]
+fn test_conditional_resource_with_attributes_keeps_guard() {
+    for attributes in [
+        serde_json::json!({"Metadata": {"note": "test"}}),
+        serde_json::json!({"UpdatePolicy": {"AutoScalingRollingUpdate": {"MinInstancesInService": 1}}}),
+        serde_json::json!({"DeletionPolicy": "Retain"}),
+        serde_json::json!({"DependsOn": ["OtherBucket"]}),
+    ] {
+        let mut resource = serde_json::json!({
+            "Type": "AWS::S3::Bucket",
+            "Condition": "CreateResource"
+        });
+        resource
+            .as_object_mut()
+            .unwrap()
+            .extend(attributes.as_object().unwrap().clone());
+        let template = serde_json::json!({
+            "Conditions": {"CreateResource": {"Fn::Equals": ["yes", "yes"]}},
+            "Resources": {
+                "OtherBucket": {"Type": "AWS::S3::Bucket"},
+                "ConditionalResource": resource
+            }
+        });
+        for class_type in [ClassType::Stack, ClassType::Construct] {
+            let cfn: CloudformationParseTree = serde_json::from_value(template.clone()).unwrap();
+            let ir = CloudformationProgramIr::from(cfn, Schema::builtin()).unwrap();
+            let mut output = Vec::new();
+            ir.synthesize("python", &mut output, "TestStack", class_type)
+                .unwrap();
+            let code = String::from_utf8(output).unwrap();
+
+            assert!(
+                code.contains("if (conditionalResource is not None):\n      conditionalResource."),
+                "Conditional resource attributes must stay inside the guard:\n{code}"
+            );
+        }
+    }
+}
+
+#[test]
 fn test_class_type_stack_mode() {
     let cfn: CloudformationParseTree = serde_json::from_str(SIMPLE_TEMPLATE).unwrap();
     let ir = CloudformationProgramIr::from(cfn, Schema::builtin()).unwrap();
