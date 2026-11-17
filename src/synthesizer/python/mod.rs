@@ -564,7 +564,10 @@ fn emit_custom_resource(
     // For conditional resources, all post-construction calls must be inside the None guard.
     if maybe_undefined
         && (resource_type_name != CFN_CUSTOM_RESOURCE
-            || reference.properties.keys().any(|name| name != "ServiceToken")
+            || reference
+                .properties
+                .keys()
+                .any(|name| name != "ServiceToken")
             || has_resource_attributes(reference))
     {
         output.line(format!("if ({var_name} is not None):"));

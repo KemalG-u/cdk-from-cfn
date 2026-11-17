@@ -88,7 +88,9 @@ fn assert_conditional_resource_has_no_empty_guard(
         let code = String::from_utf8(output).unwrap();
 
         assert!(
-            !code.trim_end().ends_with("if (conditionalResource is not None):"),
+            !code
+                .trim_end()
+                .ends_with("if (conditionalResource is not None):"),
             "Conditional resource leaves an empty Python suite:\n{code}"
         );
     }
