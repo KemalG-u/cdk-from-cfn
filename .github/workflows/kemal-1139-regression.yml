@@ -1,0 +1,55 @@
+name: Kemal issue 1139 regression
+on:
+  push:
+    branches: ['regression/python-empty-conditional-1139']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Install pinned upstream Rust toolchain
+        run: rustup toolchain install 1.100.0 --profile minimal --component rustfmt,clippy
+      - name: Focused regression tests
+        run: cargo test --locked --lib synthesizer::python::tests::test_conditional_ -- --nocapture
+      - name: Compile generated Python through the public CLI
+        if: always()
+        run: |
+          cargo build --locked --no-default-features --features python --bin cdk-from-cfn
+          python3 - <<'PY'
+          import ast
+          import json
+          import subprocess
+
+          failures = []
+          for resource_type in ('AWS::S3::Bucket', 'AWS::CloudFormation::CustomResource'):
+              properties = {} if resource_type == 'AWS::S3::Bucket' else {
+                  'ServiceToken': 'arn:aws:lambda:us-east-1:123456789:function:handler'
+              }
+              template = {
+                  'Conditions': {'CreateResource': {'Fn::Equals': ['yes', 'yes']}},
+                  'Resources': {'ConditionalResource': {
+                      'Type': resource_type, 'Condition': 'CreateResource',
+                      'Properties': properties,
+                  }},
+              }
+              for mode in ('stack', 'construct'):
+                  result = subprocess.run(
+                      ['./target/debug/cdk-from-cfn', '--language', 'python', '--as', mode],
+                      input=json.dumps(template), text=True, capture_output=True, check=True,
+                  )
+                  try:
+                      ast.parse(result.stdout)
+                  except SyntaxError as error:
+                      failures.append(f'{resource_type}/{mode}: {error}')
+                  else:
+                      print(f'PASS {resource_type}/{mode}')
+          for failure in failures:
+              print(f'FAIL {failure}')
+          raise SystemExit(bool(failures))
+          PY
